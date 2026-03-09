@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Football Lineup Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{min-height:100vh;background:#0a0a0f;font-family:'Bebas Neue','Impact',sans-serif;color:#fff;display:flex;flex-direction:column;align-items:center;padding:20px 16px;user-select:none;}
+  ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:#111;}::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
+  h1{font-size:32px;letter-spacing:4px;cursor:pointer;line-height:1;}
+  .subtitle{font-size:13px;font-family:'Barlow',sans-serif;opacity:.45;margin-top:2px;letter-spacing:1px;}
+  .formation-badge{padding:6px 18px;border-radius:4px;font-size:22px;letter-spacing:2px;font-weight:bold;border:2px solid rgba(255,255,255,.2);}
+  .header{width:100%;max-width:700px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;}
+  .main{display:flex;gap:20px;width:100%;max-width:700px;flex-wrap:wrap;justify-content:center;}
+  .pitch-wrap{position:relative;width:min(100%,400px);aspect-ratio:.68;border-radius:12px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.8),inset 0 0 0 2px rgba(255,255,255,.06);flex-shrink:0;}
+  .grass{position:absolute;inset:0;background:repeating-linear-gradient(180deg,#1a5c2a 0px,#1a5c2a 32px,#1d6630 32px,#1d6630 64px);}
+  .pitch-svg{position:absolute;inset:0;width:100%;height:100%;}
+  .drag-hint{position:absolute;bottom:6px;right:8px;font-size:9px;font-family:'Barlow',sans-serif;color:rgba(255,255,255,.3);letter-spacing:.5px;}
+  .player{position:absolute;display:flex;flex-direction:column;align-items:center;cursor:grab;transform:translate(-50%,-50%);transition:transform .15s;z-index:10;}
+  .player:hover{transform:translate(-50%,-50%) scale(1.12);}
+  .player.dragging-active{opacity:.5;cursor:grabbing;}
+  .jersey{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'Barlow',sans-serif;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.5);transition:box-shadow .15s;}
+  .nametag{margin-top:3px;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);padding:2px 6px;border-radius:3px;font-size:9px;font-family:'Barlow',sans-serif;font-weight:600;color:#fff;letter-spacing:.5px;white-space:nowrap;max-width:70px;overflow:hidden;text-overflow:ellipsis;text-align:center;border:1px solid rgba(255,255,255,.1);}
+  .controls{display:flex;flex-direction:column;gap:16px;min-width:220px;flex:1;}
+  .panel{background:rgba(255,255,255,.04);border-radius:10px;padding:14px 16px;border:1px solid rgba(255,255,255,.07);}
+  .panel-label{font-size:11px;letter-spacing:2px;opacity:.45;margin-bottom:10px;font-family:'Barlow',sans-serif;}
+  .formation-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .formation-btn{border-radius:6px;padding:8px 0;font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:2px;cursor:pointer;transition:all .15s;border:1px solid rgba(255,255,255,.08);}
+  .formation-btn:hover{background:rgba(255,255,255,.12)!important;}
+  .kit-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .kit-swatch{width:30px;height:30px;border-radius:50%;cursor:pointer;transition:transform .15s;box-shadow:0 2px 6px rgba(0,0,0,.4);}
+  .kit-swatch:hover{transform:scale(1.1);}
+  .hint-row{display:flex;gap:8px;align-items:center;margin-bottom:5px;font-size:11px;font-family:'Barlow',sans-serif;color:rgba(255,255,255,.55);}
+  .reset-btn{background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;cursor:pointer;transition:all .15s;width:100%;}
+  .reset-btn:hover{background:rgba(255,255,255,.09);}
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(6px);animation:fadeIn .2s ease;}
+  .modal-box{background:#111118;border-radius:14px;padding:28px 32px;border:1px solid rgba(255,255,255,.12);width:min(90vw,320px);box-shadow:0 32px 80px rgba(0,0,0,.8);}
+  .modal-label{font-size:11px;letter-spacing:3px;opacity:.4;margin-bottom:16px;font-family:'Barlow',sans-serif;}
+  .modal-jersey{width:48px;height:48px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:13px;font-family:'Barlow',sans-serif;font-weight:700;}
+  .modal-input{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:12px 14px;color:#fff;font-size:16px;font-family:'Barlow',sans-serif;margin-bottom:14px;}
+  .modal-input:focus{outline:none;border-color:rgba(255,255,255,.5);}
+  .modal-btns{display:flex;gap:8px;}
+  .btn-save{flex:1;border:none;border-radius:8px;padding:12px;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;cursor:pointer;}
+  .btn-cancel{flex:1;background:rgba(255,255,255,.07);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;cursor:pointer;}
+  .team-input{background:transparent;border:none;border-bottom:2px solid #fff;color:#fff;font-size:28px;font-family:'Bebas Neue',sans-serif;letter-spacing:3px;width:220px;}
+  .team-input:focus{outline:none;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes pulse{0%,100%{box-shadow:0 4px 16px rgba(0,0,0,.5),0 0 0 0 rgba(255,255,255,.3)}50%{box-shadow:0 4px 16px rgba(0,0,0,.5),0 0 0 8px rgba(255,255,255,0)}}
+  .pulse{animation:pulse 1.5s infinite;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1 id="teamNameDisplay" title="Click to edit">My Team</h1>
+    <input class="team-input" id="teamNameInput" value="My Team" style="display:none"/>
+    <div class="subtitle">FORMATION BUILDER</div>
+  </div>
+  <div class="formation-badge" id="formationBadge">4-3-3</div>
+</div>
+
+<div class="main">
+  <!-- Pitch -->
+  <div class="pitch-wrap" id="pitch">
+    <div class="grass"></div>
+    <svg class="pitch-svg" viewBox="0 0 100 147">
+      <rect x="3" y="3" width="94" height="141" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".7"/>
+      <line x1="3" y1="73.5" x2="97" y2="73.5" stroke="rgba(255,255,255,.55)" stroke-width=".7"/>
+      <circle cx="50" cy="73.5" r="13" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".7"/>
+      <circle cx="50" cy="73.5" r=".8" fill="rgba(255,255,255,.55)"/>
+      <rect x="18" y="3" width="64" height="22" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".7"/>
+      <rect x="33" y="3" width="34" height="10" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".7"/>
+      <circle cx="50" cy="17" r="4.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".5" stroke-dasharray="2 2"/>
+      <circle cx="50" cy="17" r=".8" fill="rgba(255,255,255,.55)"/>
+      <rect x="18" y="122" width="64" height="22" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".7"/>
+      <rect x="33" y="134" width="34" height="10" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".7"/>
+      <circle cx="50" cy="130" r="4.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".5" stroke-dasharray="2 2"/>
+      <circle cx="50" cy="130" r=".8" fill="rgba(255,255,255,.55)"/>
+      <rect x="42" y="1.5" width="16" height="2.5" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".8"/>
+      <rect x="42" y="143" width="16" height="2.5" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".8"/>
+      <path d="M3,8 Q7,3 9,3" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".5"/>
+      <path d="M97,8 Q93,3 91,3" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".5"/>
+      <path d="M3,139 Q7,144 9,144" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".5"/>
+      <path d="M97,139 Q93,144 91,144" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".5"/>
+    </svg>
+    <div id="players"></div>
+    <div class="drag-hint">DRAG TO REPOSITION</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="panel">
+      <div class="panel-label">FORMATION</div>
+      <div class="formation-grid" id="formationGrid"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-label">KIT COLOUR</div>
+      <div class="kit-row" id="kitRow"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-label">HOW TO USE</div>
+      <div class="hint-row"><span>🖱️</span><span>Click player to rename</span></div>
+      <div class="hint-row"><span>✋</span><span>Drag player to reposition</span></div>
+      <div class="hint-row"><span>⚡</span><span>Switch formation above</span></div>
+      <div class="hint-row"><span>🎨</span><span>Change kit colours</span></div>
+      <div class="hint-row"><span>✏️</span><span>Click team name to edit</span></div>
+    </div>
+    <button class="reset-btn" id="resetBtn">RESET LINEUP</button>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-label" id="modalLabel">EDIT PLAYER</div>
+    <div class="modal-jersey" id="modalJersey"></div>
+    <input class="modal-input" id="modalInput" placeholder="Player name"/>
+    <div class="modal-btns">
+      <button class="btn-save" id="btnSave">SAVE</button>
+      <button class="btn-cancel" id="btnCancel">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FORMATIONS = {
+  "4-4-2": [
+    {id:"gk",label:"GK",x:50,y:92},{id:"lb",label:"LB",x:15,y:74},{id:"cb1",label:"CB",x:35,y:76},
+    {id:"cb2",label:"CB",x:65,y:76},{id:"rb",label:"RB",x:85,y:74},{id:"lm",label:"LM",x:12,y:52},
+    {id:"cm1",label:"CM",x:35,y:54},{id:"cm2",label:"CM",x:65,y:54},{id:"rm",label:"RM",x:88,y:52},
+    {id:"st1",label:"ST",x:35,y:28},{id:"st2",label:"ST",x:65,y:28}
+  ],
+  "4-3-3": [
+    {id:"gk",label:"GK",x:50,y:92},{id:"lb",label:"LB",x:15,y:74},{id:"cb1",label:"CB",x:35,y:76},
+    {id:"cb2",label:"CB",x:65,y:76},{id:"rb",label:"RB",x:85,y:74},{id:"cm1",label:"CM",x:25,y:54},
+    {id:"cm2",label:"CM",x:50,y:50},{id:"cm3",label:"CM",x:75,y:54},{id:"lw",label:"LW",x:15,y:24},
+    {id:"st",label:"ST",x:50,y:18},{id:"rw",label:"RW",x:85,y:24}
+  ],
+  "4-2-3-1": [
+    {id:"gk",label:"GK",x:50,y:92},{id:"lb",label:"LB",x:15,y:74},{id:"cb1",label:"CB",x:35,y:76},
+    {id:"cb2",label:"CB",x:65,y:76},{id:"rb",label:"RB",x:85,y:74},{id:"cdm1",label:"CDM",x:36,y:60},
+    {id:"cdm2",label:"CDM",x:64,y:60},{id:"lam",label:"LAM",x:18,y:40},{id:"cam",label:"CAM",x:50,y:38},
+    {id:"ram",label:"RAM",x:82,y:40},{id:"st",label:"ST",x:50,y:18}
+  ],
+  "3-5-2": [
+    {id:"gk",label:"GK",x:50,y:92},{id:"cb1",label:"CB",x:25,y:76},{id:"cb2",label:"CB",x:50,y:78},
+    {id:"cb3",label:"CB",x:75,y:76},{id:"lm",label:"LM",x:10,y:54},{id:"cm1",label:"CM",x:30,y:52},
+    {id:"cm2",label:"CM",x:50,y:48},{id:"cm3",label:"CM",x:70,y:52},{id:"rm",label:"RM",x:90,y:54},
+    {id:"st1",label:"ST",x:35,y:24},{id:"st2",label:"ST",x:65,y:24}
+  ],
+  "5-3-2": [
+    {id:"gk",label:"GK",x:50,y:92},{id:"lwb",label:"LWB",x:8,y:68},{id:"cb1",label:"CB",x:26,y:76},
+    {id:"cb2",label:"CB",x:50,y:79},{id:"cb3",label:"CB",x:74,y:76},{id:"rwb",label:"RWB",x:92,y:68},
+    {id:"cm1",label:"CM",x:25,y:50},{id:"cm2",label:"CM",x:50,y:46},{id:"cm3",label:"CM",x:75,y:50},
+    {id:"st1",label:"ST",x:35,y:24},{id:"st2",label:"ST",x:65,y:24}
+  ],
+  "4-5-1": [
+    {id:"gk",label:"GK",x:50,y:92},{id:"lb",label:"LB",x:15,y:74},{id:"cb1",label:"CB",x:35,y:76},
+    {id:"cb2",label:"CB",x:65,y:76},{id:"rb",label:"RB",x:85,y:74},{id:"lm",label:"LM",x:10,y:50},
+    {id:"cm1",label:"CM",x:28,y:48},{id:"cm2",label:"CM",x:50,y:44},{id:"cm3",label:"CM",x:72,y:48},
+    {id:"rm",label:"RM",x:90,y:50},{id:"st",label:"ST",x:50,y:20}
+  ]
+};
+
+const DEFAULT_NAMES = {
+  gk:"Goalkeeper",lb:"Left Back",cb1:"Centre Back",cb2:"Centre Back",cb3:"Centre Back",
+  rb:"Right Back",lm:"Left Mid",cm1:"Central Mid",cm2:"Central Mid",cm3:"Central Mid",
+  rm:"Right Mid",st:"Striker",st1:"Striker",st2:"Striker",lw:"Left Wing",rw:"Right Wing",
+  cam:"Att. Mid",lam:"Left AM",ram:"Right AM",cdm1:"Def. Mid",cdm2:"Def. Mid",
+  lwb:"Left Wing Back",rwb:"Right Wing Back"
+};
+
+const KIT_COLORS = [
+  {primary:"#e63946",secondary:"#ffffff"},
+  {primary:"#1d3557",secondary:"#a8dadc"},
+  {primary:"#2d6a4f",secondary:"#ffd166"},
+  {primary:"#ffffff",secondary:"#000000"},
+  {primary:"#f4a261",secondary:"#264653"},
+  {primary:"#6a0572",secondary:"#f8edeb"}
+];
+
+let state = {
+  formation: "4-3-3",
+  players: {},
+  kit: KIT_COLORS[0],
+  customPos: {},
+  editingId: null,
+  dragId: null
+};
+
+// ---- Render ----
+function getPos(id) {
+  const key = state.formation + "-" + id;
+  return state.customPos[key] || FORMATIONS[state.formation].find(p => p.id === id);
+}
+function getName(id) {
+  return state.players[state.formation + "-" + id] || DEFAULT_NAMES[id] || id.toUpperCase();
+}
+function trunc(s, n) { return s.length > n ? s.slice(0, n-1) + "…" : s; }
+
+function renderPlayers() {
+  const wrap = document.getElementById("players");
+  wrap.innerHTML = "";
+  FORMATIONS[state.formation].forEach(pos => {
+    const p = getPos(pos.id);
+    const div = document.createElement("div");
+    div.className = "player" + (state.editingId === pos.id ? " pulse" : "");
+    div.style.left = p.x + "%";
+    div.style.top = p.y + "%";
+    div.draggable = true;
+    div.dataset.id = pos.id;
+
+    const jersey = document.createElement("div");
+    jersey.className = "jersey" + (state.editingId === pos.id ? " pulse" : "");
+    jersey.style.background = `radial-gradient(circle at 35% 35%, ${state.kit.primary}dd, ${state.kit.primary})`;
+    jersey.style.border = `2.5px solid ${state.kit.secondary}`;
+    jersey.style.color = state.kit.secondary;
+    if (state.editingId === pos.id) jersey.style.boxShadow = `0 4px 16px rgba(0,0,0,.5), 0 0 0 3px rgba(255,255,255,.6)`;
+    jersey.textContent = pos.label;
+
+    const tag = document.createElement("div");
+    tag.className = "nametag";
+    tag.textContent = trunc(getName(pos.id), 10);
+
+    div.appendChild(jersey);
+    div.appendChild(tag);
+
+    div.addEventListener("click", () => openModal(pos.id, pos.label));
+    div.addEventListener("dragstart", e => {
+      state.dragId = pos.id;
+      div.classList.add("dragging-active");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    div.addEventListener("dragend", () => div.classList.remove("dragging-active"));
+
+    wrap.appendChild(div);
+  });
+}
+
+function renderFormationBtns() {
+  const grid = document.getElementById("formationGrid");
+  grid.innerHTML = "";
+  Object.keys(FORMATIONS).forEach(f => {
+    const btn = document.createElement("button");
+    btn.className = "formation-btn";
+    btn.textContent = f;
+    const active = f === state.formation;
+    btn.style.background = active ? state.kit.primary : "rgba(255,255,255,.06)";
+    btn.style.color = active ? state.kit.secondary : "rgba(255,255,255,.8)";
+    btn.style.border = active ? `1px solid ${state.kit.secondary}44` : "1px solid rgba(255,255,255,.08)";
+    btn.addEventListener("click", () => {
+      state.formation = f;
+      state.customPos = {};
+      render();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function renderKitSwatches() {
+  const row = document.getElementById("kitRow");
+  row.innerHTML = "";
+  KIT_COLORS.forEach(k => {
+    const s = document.createElement("div");
+    s.className = "kit-swatch";
+    s.style.background = `linear-gradient(135deg, ${k.primary} 50%, ${k.secondary} 50%)`;
+    s.style.boxShadow = state.kit === k
+      ? `0 0 0 2px #0a0a0f, 0 0 0 4px ${k.primary}`
+      : "0 2px 6px rgba(0,0,0,.4)";
+    s.addEventListener("click", () => { state.kit = k; render(); });
+    row.appendChild(s);
+  });
+}
+
+function renderBadge() {
+  const b = document.getElementById("formationBadge");
+  b.textContent = state.formation;
+  b.style.background = state.kit.primary;
+  b.style.color = state.kit.secondary;
+}
+
+function render() {
+  renderPlayers();
+  renderFormationBtns();
+  renderKitSwatches();
+  renderBadge();
+}
+
+// ---- Drag & Drop on pitch ----
+const pitch = document.getElementById("pitch");
+pitch.addEventListener("dragover", e => e.preventDefault());
+pitch.addEventListener("drop", e => {
+  if (!state.dragId) return;
+  const rect = pitch.getBoundingClientRect();
+  const x = Math.max(4, Math.min(96, ((e.clientX - rect.left) / rect.width) * 100));
+  const y = Math.max(4, Math.min(96, ((e.clientY - rect.top) / rect.height) * 100));
+  state.customPos[state.formation + "-" + state.dragId] = { x, y };
+  state.dragId = null;
+  renderPlayers();
+});
+
+// ---- Modal ----
+function openModal(id, label) {
+  state.editingId = id;
+  document.getElementById("modalLabel").textContent = "EDIT PLAYER — " + id.toUpperCase();
+  const j = document.getElementById("modalJersey");
+  j.textContent = label;
+  j.style.background = `radial-gradient(circle at 35% 35%, ${state.kit.primary}cc, ${state.kit.primary})`;
+  j.style.border = `2.5px solid ${state.kit.secondary}`;
+  j.style.color = state.kit.secondary;
+  const input = document.getElementById("modalInput");
+  input.value = getName(id);
+  document.getElementById("btnSave").style.background = state.kit.primary;
+  document.getElementById("btnSave").style.color = state.kit.secondary;
+  document.getElementById("modal").style.display = "flex";
+  setTimeout(() => input.focus(), 50);
+  renderPlayers();
+}
+
+function closeModal() {
+  state.editingId = null;
+  document.getElementById("modal").style.display = "none";
+  renderPlayers();
+}
+
+function saveModal() {
+  const val = document.getElementById("modalInput").value.trim();
+  if (val) state.players[state.formation + "-" + state.editingId] = val;
+  closeModal();
+}
+
+document.getElementById("btnSave").addEventListener("click", saveModal);
+document.getElementById("btnCancel").addEventListener("click", closeModal);
+document.getElementById("modal").addEventListener("click", e => { if (e.target === document.getElementById("modal")) closeModal(); });
+document.getElementById("modalInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") saveModal();
+  if (e.key === "Escape") closeModal();
+});
+
+// ---- Team Name ----
+const teamDisplay = document.getElementById("teamNameDisplay");
+const teamInput = document.getElementById("teamNameInput");
+teamDisplay.addEventListener("click", () => {
+  teamDisplay.style.display = "none";
+  teamInput.style.display = "block";
+  teamInput.focus();
+  teamInput.select();
+});
+teamInput.addEventListener("blur", () => {
+  teamDisplay.textContent = teamInput.value || "My Team";
+  teamDisplay.style.display = "block";
+  teamInput.style.display = "none";
+});
+teamInput.addEventListener("keydown", e => { if (e.key === "Enter") teamInput.blur(); });
+
+// ---- Reset ----
+document.getElementById("resetBtn").addEventListener("click", () => {
+  state.players = {};
+  state.customPos = {};
+  teamDisplay.textContent = "My Team";
+  teamInput.value = "My Team";
+  render();
+});
+
+// ---- Init ----
+render();
+</script>
+</body>
+</html>
